@@ -1,14 +1,12 @@
 name: WorkBuddy 每日签到
 
+# 已暂停自动调度：GitHub 海外节点的会话被判失效（需国内网络环境）
+# 如需恢复定时，取消下面两行注释即可
 on:
-  schedule:
-    # 北京时间 00:05（UTC 16:05）
-    - cron: '5 16 * * *'
-    # 北京时间 00:35 兜底（脚本幂等，已签会自动跳过）
-    - cron: '35 16 * * *'
-  push:
-    branches: [master]
-  workflow_dispatch: {}   # 支持手动触发测试
+  # schedule:
+  #   - cron: '5 16 * * *'
+  #   - cron: '35 16 * * *'
+  workflow_dispatch: {}
 
 jobs:
   checkin:
@@ -16,22 +14,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: 安装依赖
-        run: |
-          pip install websocket-client
-          google-chrome --version || true
-
+        run: pip install websocket-client
       - name: 执行签到
         env:
           WB_COOKIE: ${{ secrets.WB_COOKIE }}
           WB_CHROME: google-chrome
         run: python checkin_ci.py
-
-      - name: 失败告警（可选）
-        if: failure()
-        run: echo "::warning::签到失败，请检查 Cookie 是否失效"
