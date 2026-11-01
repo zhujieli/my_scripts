@@ -45,8 +45,9 @@ def main():
     if not cdp_ready(30):
         die("❌ Chrome 启动失败")
 
+    # 先开空白页：避免页面先加载时服务端下发新的匿名 session 覆盖注入值
     tab = json.loads(urllib.request.urlopen(
-        urllib.request.Request(f"http://127.0.0.1:{PORT}/json/new?https://www.workbuddy.cn/app", method="PUT"),
+        urllib.request.Request(f"http://127.0.0.1:{PORT}/json/new?about:blank", method="PUT"),
         timeout=15).read())
 
     import websocket
@@ -63,13 +64,24 @@ def main():
                 return m
 
     call("Network.enable")
+    ok_count = 0
     for kv in cookie.split("; "):
         k, _, v = kv.partition("=")
         if not k:
             continue
-        call("Network.setCookie", {"name": k, "value": v,
-                                   "domain": "www.workbuddy.cn", "path": "/"})
-    time.sleep(2)
+        r = call("Network.setCookie", {"name": k.strip(), "value": v.strip(),
+                                       "url": "https://www.workbuddy.cn/", "path": "/"})
+        if r.get("result", {}).get("success"):
+            ok_count += 1
+    print(f"Cookie 注入 {ok_count}/{len(cookie.split('; '))}", flush=True)
+
+    # 注入完成后再导航到应用页
+    call("Page.enable")
+    call("Page.navigate", {"url": "https://www.workbuddy.cn/app"})
+    time.sleep(8)
+    cur = call("Runtime.evaluate", {"expression": "location.href + '|' + document.cookie.length",
+                                    "returnByValue": True})["result"]["result"].get("value")
+    print(f"当前页面: {cur}", flush=True)
 
     js = """
       (async () => {
